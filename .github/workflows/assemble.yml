@@ -1,0 +1,51 @@
+name: Assemble approved lesson and deploy
+on:
+  push:
+    paths:
+      - '.github/workflows/assemble.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Assemble verified single-file HTML
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64,hashlib,pathlib
+          paths=sorted(pathlib.Path('.parts').glob('part*.txt'))
+          assert len(paths)==12, f'Expected 12 parts, got {len(paths)}'
+          b=b''.join(base64.b64decode(p.read_text().strip(),validate=True) for p in paths)
+          assert hashlib.sha256(b).hexdigest()=='bbd599a1f73fa228747f25f42949807fc9a28af558038082459d94af8d35f1bc'
+          pathlib.Path('index.html').write_bytes(b)
+          print('Verified final single-file site:',len(b),'bytes')
+          PY
+      - name: Keep only index.html in the repository
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git rm -r .parts .github/workflows/assemble.yml
+          git commit -m "Publish approved single-file HTML with both embedded videos"
+          git push origin HEAD:main
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
