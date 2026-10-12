@@ -1,0 +1,28 @@
+name: Assemble one-file Saudi First State lesson
+on:
+  push:
+    branches: [main]
+    paths:
+      - "parts/**"
+      - ".github/workflows/assemble.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct and verify HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat parts/part_*.txt > index.html
+          echo "8d34cbef08b63c949e4a3167c4e1d99aa8a46aaa8a62431d016634d72325d944  index.html" | sha256sum -c -
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Assemble verified one-file lesson"
+            git push origin HEAD:main
+          fi
